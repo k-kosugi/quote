@@ -1,0 +1,13 @@
+# azd の環境 (サブスクリプション ID, イメージ名などが入る)
+.azure/
+
+# OS, エディターの生成物
+.DS_Store
+
+# 依存関係とビルドの成果物
+node_modules/
+dist/
+target/
+.venv/
+__pycache__/
+.pytest_cache/

@@ -1,0 +1,80 @@
+{
+  "name": "__INDEX_NAME__",
+  "fields": [
+    {
+      "name": "SKU_ID",
+      "type": "Edm.String",
+      "key": true,
+      "searchable": true,
+      "filterable": true,
+      "sortable": true,
+      "facetable": false,
+      "retrievable": true
+    },
+    {
+      "name": "SUMMARY",
+      "type": "Edm.String",
+      "searchable": true,
+      "filterable": false,
+      "sortable": false,
+      "facetable": false,
+      "retrievable": true
+    },
+    {
+      "name": "SUMMARY_VECTOR",
+      "type": "Collection(Edm.Single)",
+      "searchable": true,
+      "retrievable": false,
+      "stored": false,
+      "dimensions": 1536,
+      "vectorSearchProfile": "summary-vector-profile"
+    }
+  ],
+  "semantic": {
+    "defaultConfiguration": "sku-semantic-config",
+    "configurations": [
+      {
+        "name": "sku-semantic-config",
+        "prioritizedFields": {
+          "titleField": {
+            "fieldName": "SKU_ID"
+          },
+          "prioritizedContentFields": [
+            {
+              "fieldName": "SUMMARY"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "vectorSearch": {
+    "algorithms": [
+      {
+        "name": "summary-hnsw",
+        "kind": "hnsw",
+        "hnswParameters": {
+          "metric": "cosine"
+        }
+      }
+    ],
+    "profiles": [
+      {
+        "name": "summary-vector-profile",
+        "algorithm": "summary-hnsw",
+        "vectorizer": "summary-vectorizer"
+      }
+    ],
+    "vectorizers": [
+      {
+        "name": "summary-vectorizer",
+        "kind": "azureOpenAI",
+        "azureOpenAIParameters": {
+          "resourceUri": "__FOUNDRY_ENDPOINT__",
+          "deploymentId": "__EMBEDDING_DEPLOYMENT__",
+          "modelName": "__EMBEDDING_MODEL__"
+        }
+      }
+    ]
+  }
+}

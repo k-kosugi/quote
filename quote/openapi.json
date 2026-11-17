@@ -1,0 +1,515 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "見積 API",
+        "description": "## 保存と有効期限\n見積はプロセス内メモリに保存されるため, アプリケーションの再起動で失われます.\n作成時は DRAFT となり, 保存操作で SAVED になります. 修正すると DRAFT に戻ります.\nvalidUntil は作成日の14日後の日付です. 日付の算出にはサーバーのデフォルトタイムゾーンを使用します.\n修正や保存では validUntil は延長されません. この値はレスポンス専用です.\nこの API は認証や見積の変更履歴を提供しません.\n見積の対象地域は日本のみです. 地域を指定する項目はありません.\n\n## 金額計算\n通貨は JPY です. listPrice は月額単価で, 見積作成時に SKU カタログの値が自動で適用されます. リクエストでは指定できません.\nannual は追加明細では listPrice * 12 * amount (数量を含む1年分), 解約明細では0です.\n明細の annual は割引や丸めを適用しません.\ntotalAnnual は解約明細を除いた annual の合計に割引率を適用した, 数量を含む1年分の金額です.\ntotalAmount は契約期間全体の総額で, 解約明細を除いた annual の合計に 契約月数 / 12 を掛けた金額です.\nどちらも合計後に割引率を適用し, HALF_UP 方式で1円単位に丸めます.\n契約月数は契約開始日から契約終了日までの暦の月数で, 終了日を含みます. 端数の日がある場合は1か月に切り上げます.\n例: 2026-07-01 から 2029-06-30 は36か月, 同日契約は1か月です.\n\n## 契約種別と明細ルール\nすべての明細の amount が正の場合は NEW, すべて負の場合は CANCELLATION,\n正負が混在する場合は EARLY_RENEWAL です. amount に0は指定できません.\nSKU-STANDARD と SKU-PROFESSIONAL は同じ見積に共存できません.\n同じ SKU の明細を複数指定できます. 各明細は個別に集計され, SKU の照合では大文字と小文字を区別します.\n\n## SKU カタログ\nSKU カタログは別サービス (SKU カタログ API) が提供する読み取り専用のサンプルです. SKU 一覧はこの API ではなく, SKU カタログ API で取得します.\n見積リクエストでは SKU ID と数量だけを指定します. 月額単価は SKU カタログから取得され, 存在しない SKU は拒否されます.\nSKU カタログに接続できない場合は 503 を返します.\n見積に保存される listPrice は作成または修正した時点のカタログの値で, 以降のカタログの変更は反映されません.\n",
+        "version": "1.0.0"
+    },
+    "servers": [
+        {
+            "url": "http://localhost:8080",
+            "description": "Generated server url"
+        }
+    ],
+    "tags": [
+        {
+            "name": "見積",
+            "description": "見積の作成, 取得, 修正, 保存, 削除を行います."
+        }
+    ],
+    "paths": {
+        "/api/quotes/{id}": {
+            "get": {
+                "tags": [
+                    "見積"
+                ],
+                "summary": "見積を取得",
+                "description": "パスの UUID に一致する見積を返します. 見積は作成日から14日後の validUntil を持ちます.",
+                "operationId": "getQuote",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "見積の UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "見積を返します",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/QuoteResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "UUID の形式が不正です",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetail"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "見積が存在しません",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetail"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "見積"
+                ],
+                "summary": "編集可能なすべての項目を置き換え, 見積を DRAFT に戻す",
+                "description": "指定した見積の契約条件, SKU 明細, 割引率をリクエスト内容で全置換します.\nID と作成日は維持され, 成功すると状態は DRAFT に戻ります.\nvalidUntil は更新されません. 入力が不正な場合, 元の内容と状態は変更されません.\n",
+                "operationId": "reviseQuote",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "見積の UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/QuoteRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "修正後の見積を返します",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/QuoteResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "リクエストまたは業務ルールが不正です",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetail"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "見積が存在しません",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetail"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "見積"
+                ],
+                "summary": "下書きまたは保存済みの見積を削除",
+                "description": "UUID に一致する見積を削除します. 削除後に取得すると404を返します.",
+                "operationId": "deleteQuote",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "見積の UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "削除しました. レスポンスボディはありません"
+                    },
+                    "400": {
+                        "description": "UUID の形式が不正です",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetail"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "見積が存在しません",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetail"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/quotes": {
+            "get": {
+                "tags": [
+                    "見積"
+                ],
+                "summary": "下書きと保存済みの見積一覧を取得",
+                "description": "プロセス内メモリに保存されている DRAFT と SAVED の見積を UUID 順に返します.",
+                "operationId": "listQuotes",
+                "responses": {
+                    "200": {
+                        "description": "保存済みの見積一覧. 見積がない場合は空の配列を返します.",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/QuoteResponse"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "見積"
+                ],
+                "summary": "下書きの見積を作成して保持",
+                "description": "リクエストの全項目を検証し, 新しい UUID を割り当てて DRAFT の見積を作成します.\n成功時は作成した見積と, 取得用 URL を示す Location ヘッダーを返します.\n見積データはプロセス内メモリに保持されます.\n",
+                "operationId": "createQuote",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/QuoteRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "下書きを作成しました",
+                        "headers": {
+                            "Location": {
+                                "description": "作成した見積の相対 URL",
+                                "style": "simple",
+                                "schema": {
+                                    "type": "string",
+                                    "format": "uri-reference"
+                                }
+                            }
+                        },
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/QuoteResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "リクエストまたは業務ルールが不正です",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetail"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/quotes/{id}/save": {
+            "post": {
+                "tags": [
+                    "見積"
+                ],
+                "summary": "見積を検証し, 状態を SAVED に変更",
+                "description": "保存前に見積の業務ルールを再検証し, 状態を SAVED にします.\nリクエストボディは不要です. 保存済みの見積を再度保存しても SAVED のままです.\nvalidUntil は延長されません.\n",
+                "operationId": "saveQuote",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "見積の UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "保存済みの見積を返します",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/QuoteResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "リクエストまたは業務ルールが不正です",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetail"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "見積が存在しません",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetail"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "LineRequest": {
+                "type": "object",
+                "description": "SKU ID と数量を指定する明細. 月額単価は SKU カタログの値が自動で適用されます. SKU-STANDARD と SKU-PROFESSIONAL は同じ見積に含められません.",
+                "properties": {
+                    "sku": {
+                        "type": "string",
+                        "description": "SKU ID. SKU カタログに存在する値のみ指定できます. 空文字や空白のみの値は指定できません. 前後の空白を除去し, 大文字と小文字を区別して照合します.",
+                        "minLength": 1,
+                        "pattern": "\\S"
+                    },
+                    "amount": {
+                        "type": "integer",
+                        "format": "int32",
+                        "description": "追加は正の整数, 解約は負の整数で指定します. 0は指定できません. 数量の正負から見積の契約種別を判定します.",
+                        "maximum": 2147483647,
+                        "minimum": -2147483648
+                    }
+                },
+                "required": [
+                    "amount",
+                    "sku"
+                ]
+            },
+            "QuoteRequest": {
+                "type": "object",
+                "description": "見積の作成および修正に使用する入力. 計算済み項目や未知の項目は指定できません.",
+                "properties": {
+                    "contractStart": {
+                        "type": "string",
+                        "format": "date",
+                        "description": "契約開始日. contractEnd と同じ日付, またはそれ以前の日付を指定してください."
+                    },
+                    "contractEnd": {
+                        "type": "string",
+                        "format": "date",
+                        "description": "契約終了日. contractStart より前の日付は指定できません."
+                    },
+                    "skuList": {
+                        "type": "array",
+                        "description": "見積に含める SKU 明細. 1件以上必要です. 同じ SKU の重複は許可され, 別々に集計されます.",
+                        "items": {
+                            "$ref": "#/components/schemas/LineRequest"
+                        },
+                        "minItems": 1
+                    },
+                    "discountRate": {
+                        "type": "number",
+                        "description": "見積全体に適用する割引率 (%). 0から100までの値を指定します. 各明細の annual 自体には適用しません.",
+                        "maximum": 100,
+                        "minimum": 0
+                    }
+                },
+                "required": [
+                    "contractEnd",
+                    "contractStart",
+                    "discountRate",
+                    "skuList"
+                ]
+            },
+            "ProblemDetail": {
+                "type": "object",
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "format": "uri"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "integer",
+                        "format": "int32"
+                    },
+                    "detail": {
+                        "type": "string"
+                    },
+                    "instance": {
+                        "type": "string",
+                        "format": "uri"
+                    },
+                    "properties": {
+                        "type": "object",
+                        "additionalProperties": {}
+                    }
+                }
+            },
+            "LineResponse": {
+                "type": "object",
+                "description": "SKU, 月額単価, 数量, 割引前の年額 (数量込み) を含む見積明細.",
+                "properties": {
+                    "sku": {
+                        "type": "string",
+                        "description": "前後の空白を除去した SKU ID. 大文字と小文字を区別します."
+                    },
+                    "listPrice": {
+                        "type": "number",
+                        "description": "月額単価 (JPY). 0以上の値です.",
+                        "minimum": 0
+                    },
+                    "amount": {
+                        "type": "integer",
+                        "format": "int32",
+                        "description": "追加は正の整数, 解約は負の整数です. 0にはなりません.",
+                        "maximum": 2147483647,
+                        "minimum": -2147483648
+                    },
+                    "annual": {
+                        "type": "number",
+                        "description": "割引前の年額 (数量込み). 追加明細では listPrice * 12 * amount, 解約明細では0です.",
+                        "minimum": 0
+                    }
+                },
+                "required": [
+                    "amount",
+                    "annual",
+                    "listPrice",
+                    "sku"
+                ]
+            },
+            "QuoteResponse": {
+                "type": "object",
+                "description": "見積の識別子, 契約条件, 明細, 保存状態, サーバー計算の有効期限と合計金額を含むレスポンス.",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "見積の UUID"
+                    },
+                    "validUntil": {
+                        "type": "string",
+                        "format": "date",
+                        "description": "サーバーのデフォルトタイムゾーンに基づく作成日の14暦日後. 修正や保存では延長されません.",
+                        "readOnly": true
+                    },
+                    "contractStart": {
+                        "type": "string",
+                        "format": "date",
+                        "description": "契約開始日"
+                    },
+                    "contractEnd": {
+                        "type": "string",
+                        "format": "date",
+                        "description": "契約終了日"
+                    },
+                    "contractType": {
+                        "type": "string",
+                        "description": "明細数量の符号から決まる契約種別. 正のみは NEW, 負のみは CANCELLATION, 正負混在は EARLY_RENEWAL.",
+                        "enum": [
+                            "NEW",
+                            "CANCELLATION",
+                            "EARLY_RENEWAL"
+                        ]
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "作成または修正後は DRAFT, 保存後は SAVED.",
+                        "enum": [
+                            "DRAFT",
+                            "SAVED"
+                        ]
+                    },
+                    "skuList": {
+                        "type": "array",
+                        "description": "見積の SKU 明細. 同じ SKU を複数含む場合, 各明細を個別に集計します.",
+                        "items": {
+                            "$ref": "#/components/schemas/LineResponse"
+                        },
+                        "minItems": 1
+                    },
+                    "discountRate": {
+                        "type": "number",
+                        "description": "合計金額に適用した見積全体の割引率 (%). 各明細の annual には適用されません.",
+                        "maximum": 100,
+                        "minimum": 0
+                    },
+                    "totalAnnual": {
+                        "type": "number",
+                        "description": "解約明細を除いた annual の合計に割引率を適用し, HALF_UP 方式で1円単位に丸めた, 数量を含む1年分の金額. 契約期間は乗算しません.",
+                        "minimum": 0
+                    },
+                    "totalAmount": {
+                        "type": "number",
+                        "description": "契約期間全体の総額. 解約明細を除いた annual の合計に 契約月数 / 12 を掛け, 割引率を適用し, HALF_UP 方式で1円単位に丸めた金額. 契約月数は終了日を含む暦の月数で, 端数の日は1か月に切り上げます.",
+                        "minimum": 0
+                    }
+                },
+                "required": [
+                    "contractEnd",
+                    "contractStart",
+                    "contractType",
+                    "discountRate",
+                    "id",
+                    "skuList",
+                    "status",
+                    "totalAmount",
+                    "totalAnnual",
+                    "validUntil"
+                ]
+            }
+        }
+    }
+}

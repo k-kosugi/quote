@@ -1,0 +1,38 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+
+name: quote
+
+infra:
+  provider: bicep
+  path: infrastructure
+  module: main
+
+hooks:
+  # Bicep では作成できない AI Search のインデックス, ナレッジ (ベクトル化した SKU の概要), ナレッジソース, ナレッジベースを,
+  # インフラの作成後に作成する. Foundry のエージェントは作成しない (手で作る)
+  postprovision:
+    shell: sh
+    run: ./infrastructure/hooks/setup-search.sh
+
+services:
+  quote:
+    project: ./quote
+    language: docker
+    host: containerapp
+    docker:
+      path: ./Dockerfile
+      remoteBuild: true
+  catalog:
+    project: ./catalog
+    language: docker
+    host: containerapp
+    docker:
+      path: ./Dockerfile
+      remoteBuild: true
+  frontend:
+    project: ./frontend
+    language: docker
+    host: containerapp
+    docker:
+      path: ./Dockerfile
+      remoteBuild: true

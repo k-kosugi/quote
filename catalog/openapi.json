@@ -1,0 +1,146 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "SKU カタログ API",
+        "description": "見積で利用可能なサンプル SKU 情報を提供する読み取り専用の API です.\nカタログはプロセス内メモリに保持し, 認証は行いません.\nSKU の月額単価は JPY で, 見積 API が見積の作成と修正のたびにこの API から取得します.",
+        "version": "1.0.0"
+    },
+    "paths": {
+        "/api/skus": {
+            "get": {
+                "tags": [
+                    "SKU カタログ"
+                ],
+                "summary": "SKU ID, 月額単価, 説明の一覧を取得",
+                "description": "リクエストボディやパラメーターは不要です.\n読み取り専用のインメモリサンプルカタログを SKU ID の昇順で返します.\n見積作成時は, ここに載っている SKU ID の月額単価が自動で適用されます.",
+                "operationId": "listSkus",
+                "responses": {
+                    "200": {
+                        "description": "SKU ID, 月額単価 (JPY), 説明を含む一覧. カタログが空の場合は空の配列を返します.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/SkuResponse"
+                                    },
+                                    "type": "array",
+                                    "title": "Response Listskus"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/skus/{sku_id}": {
+            "get": {
+                "tags": [
+                    "SKU カタログ"
+                ],
+                "summary": "SKU ID を指定して SKU を取得",
+                "description": "SKU ID が完全に一致する SKU を返します. 大文字と小文字は区別します.",
+                "operationId": "getSku",
+                "parameters": [
+                    {
+                        "name": "sku_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "description": "SKU ID. 前後の空白は取り除き, 大文字と小文字を区別して照合します.",
+                            "examples": [
+                                "SKU-A"
+                            ],
+                            "title": "Sku Id"
+                        },
+                        "description": "SKU ID. 前後の空白は取り除き, 大文字と小文字を区別して照合します."
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "SKU ID, 月額単価 (JPY), 説明.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SkuResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "指定した SKU ID がカタログに存在しません.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "ErrorResponse": {
+                "properties": {
+                    "detail": {
+                        "type": "string",
+                        "title": "Detail",
+                        "description": "エラーの理由"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "detail"
+                ],
+                "title": "ErrorResponse",
+                "description": "エラーの理由を伝える DTO."
+            },
+            "SkuResponse": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "title": "Id",
+                        "description": "一意の SKU ID. 見積の SKU 照合では大文字と小文字を区別します."
+                    },
+                    "listPrice": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ],
+                        "minimum": 0.0,
+                        "title": "Listprice",
+                        "description": "サンプルの月額単価 (JPY). 見積作成時にはこの値が listPrice として自動で適用されます."
+                    },
+                    "description": {
+                        "type": "string",
+                        "minLength": 1,
+                        "title": "Description",
+                        "description": "SKU の概要説明"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "id",
+                    "listPrice",
+                    "description"
+                ],
+                "title": "SkuResponse",
+                "description": "SKU の ID と円建て月額価格および概要を公開する DTO."
+            }
+        }
+    },
+    "servers": [
+        {
+            "url": "http://localhost:8000",
+            "description": "Generated server url"
+        }
+    ]
+}

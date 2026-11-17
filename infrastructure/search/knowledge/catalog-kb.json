@@ -1,0 +1,23 @@
+{
+  "name": "catalog-kb",
+  "description": "SKU カタログのナレッジベース. SKU の概要 (非構造化データ) と, 単価などの正確な値 (構造化データ) を束ねる.",
+  "retrievalInstructions": "SKU の機能, 向いている場面, 違いに関する質問は sku-index-ks を使う. SKU の ID, 月額単価, 一覧に関する質問は catalog-mcp-ks を使う. 質問によっては両方を使う.",
+  "answerInstructions": "日本語で簡潔に答える. 単価は catalog-mcp-ks の値だけを使い, 推測しない.",
+  "outputMode": "answerSynthesis",
+  "knowledgeSources": [
+    { "name": "sku-index-ks" },
+    { "name": "catalog-mcp-ks" }
+  ],
+  "models": [
+    {
+      "kind": "azureOpenAI",
+      "azureOpenAIParameters": {
+        "resourceUri": "__FOUNDRY_ENDPOINT__",
+        "deploymentId": "__CHAT_DEPLOYMENT__",
+        "modelName": "__CHAT_MODEL__"
+      }
+    }
+  ],
+  "encryptionKey": null,
+  "retrievalReasoningEffort": { "kind": "low" }
+}

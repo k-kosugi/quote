@@ -1,0 +1,14 @@
+{
+  "name": "sku-index-ks",
+  "kind": "searchIndex",
+  "description": "SKU の概要 (非構造化データ). 製品の機能、向いている場面、他の SKU との違いを検索する.",
+  "encryptionKey": null,
+  "searchIndexParameters": {
+    "searchIndexName": "__INDEX_NAME__",
+    "semanticConfigurationName": "sku-semantic-config",
+    "sourceDataFields": [
+      { "name": "SKU_ID" },
+      { "name": "SUMMARY" }
+    ]
+  }
+}

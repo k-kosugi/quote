@@ -1,0 +1,24 @@
+{
+  "name": "catalog-mcp-ks",
+  "kind": "mcpServer",
+  "description": "SKU カタログ (構造化データ). SKU の ID, 月額単価 (JPY), 説明を, API Management の MCP サーバー経由で取得する.",
+  "resultsProcessing": "rerank",
+  "encryptionKey": null,
+  "mcpServerParameters": {
+    "serverURL": "__CATALOG_MCP_URL__",
+    "tools": [
+      {
+        "name": "listSkus",
+        "outputParsing": { "kind": "auto" },
+        "resultsProcessing": "none",
+        "maxOutputTokens": 2000
+      },
+      {
+        "name": "getSku",
+        "outputParsing": { "kind": "auto" },
+        "resultsProcessing": "none",
+        "maxOutputTokens": 1000
+      }
+    ]
+  }
+}

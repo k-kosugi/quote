@@ -1,0 +1,58 @@
+# 転送先は起動時ではなくリクエスト時に名前解決する. quote が起動前でも nginx 自体は起動し, /readyz で未接続を検知できる
+resolver ${NGINX_LOCAL_RESOLVERS} valid=10s ipv6=off;
+
+server {
+    listen 8080;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # QUOTE_URL と CATALOG_URL は末尾にスラッシュを付けない
+    set $quote "${QUOTE_URL}";
+    set $catalog "${CATALOG_URL}";
+
+    # nginx 自身の生存だけを返す. quote に依存させない (quote の停止で再起動を繰り返さないため)
+    location = /healthz {
+        access_log off;
+        return 200 "ok";
+    }
+
+    # quote に届くことを確認する. 届かない (接続失敗, タイムアウト, 5xx) 場合は 5xx を返し, Readiness probe を失敗させる
+    location = /readyz {
+        access_log off;
+        proxy_pass $quote/api/quotes;
+        proxy_ssl_server_name on;
+        proxy_set_header Host $proxy_host;
+        proxy_connect_timeout 2s;
+        proxy_read_timeout 2s;
+    }
+
+    # SKU カタログは見積とは別のサービスなので, /api/skus だけを catalog へ転送する
+    location /api/skus {
+        proxy_pass $catalog$request_uri;
+        proxy_ssl_server_name on;
+        proxy_set_header Host $proxy_host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+    }
+
+    location /api/ {
+        # 変数を使う proxy_pass はパスを書き換えないため, リクエストの URI をそのまま渡す
+        proxy_pass $quote$request_uri;
+        proxy_ssl_server_name on;
+        # Container Apps はホスト名でルーティングするため, 転送先のホスト名を渡す
+        proxy_set_header Host $proxy_host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+    }
+
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    location / {
+        try_files $uri /index.html;
+    }
+}
