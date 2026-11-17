@@ -54,10 +54,14 @@ Foundry IQ は、**業務ルールがシステムとして存在しない場合*
 flowchart LR
     Browser[ブラウザ] -->|HTTPS| Frontend["frontend<br/>(nginx)"]
     Frontend -->|"/api を転送"| Apim["API Management<br/>(REST / MCP)"]
-    Apim --> Quote["quote<br/>(Spring Boot)"]
-    Apim --> Catalog["catalog<br/>(Python / FastAPI)"]
+    subgraph API
+        Quote["quote<br/>(Spring Boot)"]
+        Catalog["catalog<br/>(Python / FastAPI)"]
+    end
+    Apim --> Quote
+    Apim --> Catalog
     Quote -->|"単価を取得"| Apim
-    subgraph Foundry
+    subgraph MSFoundry["Microsoft Foundry"]
         QuoteAgent["quote-agent<br/>(OpenAPI ツール)"]
         CatalogAgent["catalog-agent"]
     end
