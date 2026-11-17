@@ -57,8 +57,12 @@ flowchart LR
     Apim --> Quote["quote<br/>(Spring Boot)"]
     Apim --> Catalog["catalog<br/>(Python / FastAPI)"]
     Quote -->|"単価を取得"| Apim
-    QuoteAgent["quote-agent<br/>(OpenAPI ツール)"] -->|HTTPS| Quote
-    CatalogAgent["catalog-agent"] -->|"ナレッジを検索"| IQ[("Foundry IQ")]
+    subgraph Foundry
+        QuoteAgent["quote-agent<br/>(OpenAPI ツール)"]
+        CatalogAgent["catalog-agent"]
+    end
+    QuoteAgent -->|"OpenAPI (HTTPS)"| Apim
+    CatalogAgent -->|"ナレッジを検索"| IQ[("Foundry IQ")]
     IQ -->|"非構造化データ"| Search[("AI Search")]
     IQ -->|"MCP (構造化データ)"| Apim
 ```
